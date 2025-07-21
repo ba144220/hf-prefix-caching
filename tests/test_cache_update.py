@@ -28,10 +28,7 @@ def main():
     prefix_cache.update(input_ids, output.past_key_values)
     for key, cache_block in prefix_cache.caches.items():
         print(key[:10], cache_block)
-    print("-" * 100)
-    prefix_cache.update(input_ids, output.past_key_values, start_block_idx=2)
-    for key, cache_block in prefix_cache.caches.items():
-        print(key[:10], cache_block)
+
     
     
 

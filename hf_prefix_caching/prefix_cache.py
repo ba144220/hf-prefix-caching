@@ -27,7 +27,6 @@ class PrefixCache:
         self,
         input_ids: torch.Tensor,
         past_key_values: DynamicCache,
-        start_block_idx: int = 0,
     ):
         # Check past_key_values is a DynamicCache
         if not isinstance(past_key_values, DynamicCache):
@@ -66,8 +65,12 @@ class PrefixCache:
                         input_ids=input_ids[batch_idx, start_pos:end_pos].tolist(),
                     )
                 else:
-                    if block_idx >= start_block_idx:
-                        self.caches[block_hash].num_hits += 1
+                    self.caches[block_hash].num_hits += 1
 
                 prev_hashes[batch_idx] = block_hash
     
+    def get(
+        self,
+        input_ids: torch.Tensor,
+    ) -> DynamicCache:
+        pass
