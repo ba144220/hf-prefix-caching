@@ -15,6 +15,21 @@ def crop_dynamic_cache(
             new_cache.value_cache[idx] = new_cache.value_cache[idx][..., start_idx:end_idx, :]
     return new_cache
 
+def crop_first(
+    cache: DynamicCache,
+    length: int,
+) -> DynamicCache:
+    new_cache = DynamicCache()
+    for layer_idx in range(len(cache.key_cache)):
+        if cache.key_cache[layer_idx].numel():
+            layer_keys = cache.key_cache[layer_idx][..., :length, :]
+            layer_values = cache.value_cache[layer_idx][..., :length, :]
+            new_cache.update(layer_keys, layer_values, layer_idx)
+
+            cache.key_cache[layer_idx] = cache.key_cache[layer_idx][..., length:, :]
+            cache.value_cache[layer_idx] = cache.value_cache[layer_idx][..., length:, :]
+    return new_cache
+
 def concat_dynamic_cache(
     caches: List[DynamicCache],
 ) -> DynamicCache:
