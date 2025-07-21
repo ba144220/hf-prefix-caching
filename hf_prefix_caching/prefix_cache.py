@@ -3,7 +3,7 @@ from datetime import datetime
 import torch
 from transformers.cache_utils import DynamicCache
 from hf_prefix_caching.types import CacheHash, CacheBlock
-from hf_prefix_caching.utils.cache import crop_dynamic_cache
+from hf_prefix_caching.utils.cache import crop_dynamic_cache, concat_dynamic_cache
 from hf_prefix_caching.utils.hashing import batched_hash
 
 INIT_HASH = CacheHash("0")
@@ -73,4 +73,33 @@ class PrefixCache:
         self,
         input_ids: torch.Tensor,
     ) -> DynamicCache:
-        pass
+        # Crop input_ids to the multiple of block_size
+        batch_size, seq_len = input_ids.shape
+        block_num = seq_len // self.block_size
+        input_ids = input_ids[:, :block_num * self.block_size]
+
+        prev_hashes = [INIT_HASH for _ in range(batch_size)]
+
+        caches: List[DynamicCache] = []
+
+        for block_idx in range(block_num):
+            start_pos = block_idx * self.block_size
+            end_pos = start_pos + self.block_size
+
+            new_hashes: List[CacheHash] = batched_hash(prev_hashes, input_ids[:, start_pos:end_pos])
+            batch_caches: List[DynamicCache] = []
+            for batch_idx in range(batch_size):
+                block_hash = new_hashes[batch_idx]
+                
+                if block_hash in self.caches:
+                    batch_caches.append(self.caches[block_hash].cache)
+                else:
+                    break
+
+                prev_hashes[batch_idx] = block_hash
+
+            if len(batch_caches) != batch_size:
+                break
+            caches.append(DynamicCache.from_batch_splits(batch_caches))
+
+        return concat_dynamic_cache(caches)
