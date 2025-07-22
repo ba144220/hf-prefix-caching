@@ -25,3 +25,6 @@ Issues="https://github.com/ba144220/hf-prefix-caching/issues"
 
 [tool.setuptools.packages.find]
 include = ["hf_prefix_caching*"]
+
+[tool.setuptools.package-dir]
+"" = "."
