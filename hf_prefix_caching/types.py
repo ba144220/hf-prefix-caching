@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import NewType, Optional
-from datetime import datetime
 import torch
 from transformers.cache_utils import DynamicCache
 
@@ -8,7 +7,8 @@ from transformers.cache_utils import DynamicCache
 class CacheBlock:
     cache: DynamicCache
     num_hits: int
-    created_at: datetime
+    created_at: int
+    last_hit_at: int
     start_pos: int
     end_pos: int # exclusive
     input_ids: Optional[torch.Tensor] = None

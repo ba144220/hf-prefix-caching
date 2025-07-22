@@ -39,18 +39,19 @@ def prefix_caching_inference(
     batched_dataset: Dataset,
     prefix_cache: PrefixCache,
 ) -> None:
-    
-    for batch in tqdm(batched_dataset, desc="Prefix Caching Inference"):
+    get_time = 0
+    update_time = 0
+    for i, batch in enumerate(tqdm(batched_dataset, desc="Prefix Caching Inference")):
         inputs = tokenizer(batch["text"], padding=True, truncation=True, return_tensors="pt").to(model.device)
         input_ids = inputs["input_ids"]
         attention_mask = inputs["attention_mask"]
 
+        start_time = time.perf_counter_ns()
         kv_cache = prefix_cache.get(input_ids)
+        get_time += time.perf_counter_ns() - start_time
 
         kv_length = kv_cache.get_seq_length()
         remaining_input_ids = input_ids[:, kv_length:]
-
-        # print(f"Hit sequence length: {kv_length}")
 
         outputs: CausalLMOutputWithPast = model.forward(
             input_ids=remaining_input_ids,
@@ -60,8 +61,13 @@ def prefix_caching_inference(
             use_cache=True,
             past_key_values=kv_cache,
         )
-
+        
+        start_time = time.perf_counter_ns()
         prefix_cache.update(input_ids, outputs.past_key_values)
+        update_time += time.perf_counter_ns() - start_time
+
+    print(f"Get time: {get_time / 1e6} ms")
+    print(f"Update time: {update_time / 1e6} ms")
 
 
 @torch.no_grad()
@@ -74,7 +80,7 @@ def main():
 
     dataset = prepare_mmlu_dataset(tokenizer, optimize_batching=True, dataset_num_proc=64, num_shots=5)
 
-    dataset = dataset.select(range(256))
+    dataset = dataset.select(range(1024))
     batched_dataset = dataset.batch(batch_size=8) 
 
     with timeit("baseline_inference"):
@@ -83,16 +89,13 @@ def main():
     prefix_cache = PrefixCache(
         block_size=64,
         padding_side=tokenizer.padding_side,
-        max_block_length=50,
+        max_block_length=40,
         max_num_blocks=128,
+        max_new_blocks=4,
     )
 
     with timeit("prefix_caching_inference"):
-        prefix_caching_inference(model, tokenizer, batched_dataset, prefix_cache)
-
-    # for cache_hash, cache_block in prefix_cache.caches.items():
-    #     print(cache_hash[:10], cache_block)    
-
+        prefix_caching_inference(model, tokenizer, batched_dataset, prefix_cache, update=True)
 
 
 if __name__ == "__main__":

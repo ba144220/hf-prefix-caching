@@ -13,6 +13,7 @@ class PrefixCache:
         self,
         max_num_blocks: int = 2048,
         max_block_length: int = 100, # i.e. total length is max_block_length * block_size
+        max_new_blocks: int = 4, # max number of new blocks to add in one update
         block_size: int = 16,
         padding_side: Literal["left", "right"] = "right",
     ):
@@ -25,6 +26,64 @@ class PrefixCache:
 
         self.caches: Dict[CacheHash, CacheBlock] = {}
 
+        self.epoch = 0
+        self.evict_size = 0.1
+        self.max_new_blocks = max_new_blocks
+
+    def _get_batch_eviction_candidates(self, num_to_evict: int) -> List[CacheHash]:
+        """Get multiple eviction candidates sorted by priority (lowest first)"""
+        if not self.caches or num_to_evict <= 0:
+            return []
+            
+        current_epoch = self.epoch
+        
+        # Calculate stats for normalization
+        all_blocks = list(self.caches.values())
+        max_hits = max(b.num_hits for b in all_blocks)
+        max_age = max(current_epoch - b.created_at for b in all_blocks) or 1
+        
+        def calculate_priority_score(block: CacheBlock) -> float:
+            # Higher score = higher priority = keep longer
+            
+            # Hit frequency (normalized)
+            hit_score = block.num_hits / max_hits if max_hits > 0 else 0
+            
+            # Recency (recent access is valuable)
+            epochs_since_access = current_epoch - block.last_hit_at
+            recency_score = 1.0 / (1 + epochs_since_access)
+            
+            # Age penalty (very old blocks are less valuable)
+            age = current_epoch - block.created_at
+            age_score = 1.0 / (1 + age / max_age)
+            
+            # Position value (earlier sequence positions often more important)
+            position_score = 1.0 / (1 + block.start_pos / 1000)
+            
+            # Weighted combination
+            return (0.2 * hit_score + 
+                    0.2 * recency_score + 
+                    0.2 * age_score + 
+                    0.4 * position_score)
+        
+        # Sort all cache entries by priority (lowest first = evict first)
+        sorted_entries = sorted(
+            self.caches.keys(),
+            key=lambda x: calculate_priority_score(self.caches[x])
+        )
+        
+        # Return the lowest priority entries up to num_to_evict
+        return sorted_entries[:min(num_to_evict, len(sorted_entries))]
+
+    def _batch_evict(self, num_to_evict: int) -> int:
+        """Evict multiple blocks at once. Returns number of blocks actually evicted."""
+        candidates = self._get_batch_eviction_candidates(num_to_evict)
+        
+        evicted_count = 0
+        for block_hash in candidates:
+            if block_hash in self.caches:  # Double-check it still exists
+                self.caches.pop(block_hash)
+                evicted_count += 1
+        return evicted_count
     def update(
         self,
         input_ids: torch.Tensor,
@@ -48,6 +107,8 @@ class PrefixCache:
 
         prev_hashes = [INIT_HASH for _ in range(batch_size)]
 
+        new_blocks = [0] * batch_size
+
         for block_idx in range(block_num):
             start_pos = block_idx * self.block_size
             end_pos = start_pos + self.block_size
@@ -60,20 +121,27 @@ class PrefixCache:
                 block_hash = new_hashes[batch_idx]
                 if block_hash not in self.caches:
                     if len(self.caches) >= self.max_num_blocks:
-                        self.caches.pop(min(self.caches.keys(), key=lambda x: (self.caches[x].num_hits, self.caches[x].created_at)))
+                        self._batch_evict(int(self.max_num_blocks * self.evict_size))
 
-                    self.caches[block_hash] = CacheBlock(
-                        cache=kv_caches[batch_idx],
-                        num_hits=1,
-                        created_at=datetime.now(),
-                        start_pos=start_pos,
-                        end_pos=end_pos,
-                        input_ids=input_ids[batch_idx, start_pos:end_pos].tolist(),
-                    )
+                    if new_blocks[batch_idx] < self.max_new_blocks:
+                        self.caches[block_hash] = CacheBlock(
+                            cache=kv_caches[batch_idx],
+                            num_hits=1,
+                            created_at=self.epoch,
+                            last_hit_at=self.epoch,
+                            start_pos=start_pos,
+                            end_pos=end_pos,
+                            input_ids=input_ids[batch_idx, start_pos:end_pos].tolist(),
+                        )
+                        new_blocks[batch_idx] += 1
                 else:
                     self.caches[block_hash].num_hits += 1
+                    self.caches[block_hash].last_hit_at = self.epoch
 
-                prev_hashes[batch_idx] = block_hash    
+                prev_hashes[batch_idx] = block_hash
+
+        self.epoch += 1
+
     def get(
         self,
         input_ids: torch.Tensor,
