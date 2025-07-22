@@ -90,11 +90,16 @@ class MMLUTask:
         return prefixes
 
 
-def prepare_mmlu_dataset(tokenizer: PreTrainedTokenizerBase, num_shots: int = 0, optimize_batching: bool = False, dataset_num_proc: int = 1) -> Dataset:
+def prepare_mmlu_dataset(
+    num_shots: int = 0, 
+    dataset_num_proc: int = 1,
+    optimize_batching: bool = False, 
+    tokenizer: PreTrainedTokenizerBase = None, 
+) -> Dataset:
     mmlu_task = MMLUTask(num_shots=num_shots, num_proc=dataset_num_proc)
     dataset = mmlu_task.get_dataset()
 
-    if optimize_batching:
+    if optimize_batching and tokenizer is not None:
         def get_tokenized_length(example):
             length = len(tokenizer.encode(example["text"]))
             return {

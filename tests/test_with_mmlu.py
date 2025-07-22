@@ -78,7 +78,7 @@ def main():
     model = Qwen3ForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16, device_map="cuda:0")
     model.eval()
 
-    dataset = prepare_mmlu_dataset(tokenizer, optimize_batching=True, dataset_num_proc=64, num_shots=5)
+    dataset = prepare_mmlu_dataset(tokenizer=tokenizer, optimize_batching=True, dataset_num_proc=64, num_shots=5)
 
     dataset = dataset.select(range(1024))
     batched_dataset = dataset.batch(batch_size=8) 
