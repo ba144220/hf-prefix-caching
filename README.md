@@ -1,28 +1,28 @@
 # HF Prefix Caching
 
-Add three lines to speed up your HuggingFace models with prefix caching.
+Add a few lines to speed up your HuggingFace models with prefix caching.
 
-```python
+```diff
 
-prefix_cache = PrefixCache()
++ prefix_cache = PrefixCache()
 
-for ... # in the inference loop ...
-    kv_cache = prefix_cache.get(input_ids)
+for batch in batches # inference loop ...
++   kv_cache = prefix_cache.get(input_ids)
 
     # Forward pass with cached key-values
     outputs = model.forward(
         ...
-        use_cache=True,
-        past_key_values=kv_cache,
++       use_cache=True,
++       past_key_values=kv_cache,
     )
 
-    prefix_cache.update(input_ids, outputs.past_key_values)
++   prefix_cache.update(input_ids, outputs.past_key_values)
 ```
 
 ### Features
 
 - **Significant Speedup**: **2-3x speedup** when dealing datasets with repeated prefixes, such as `MMLU`
-- **Easy Integration**: Add **three lines** of code to your existing inference loop
+- **Easy Integration**: Add only a few lines of code to your existing inference loop
 - **Automatic Cache Management**: Automatically manage the cache size and remove the least used prefixes
 - **Chunked Caching**: Divide KV caches into smaller blocks, preventing from taking up big contiguous memory blocks
 
@@ -175,5 +175,5 @@ We tested the performance of the prefix cache on `MMLU` dataset (see `tests/test
 | Prefix Caching (w/o Pre-built Cache)| ✅       | 1          | 157.94   | 0.92x   |
 | Prefix Caching (w/ Pre-built Cache) | ✅       | 1          | 122.68   | **1.29x**   |
 
-> [!INFO]
+> [!NOTE]
 > If the dataset is shuffled, set the batch size to 1 to prevent wasted padding tokens.
