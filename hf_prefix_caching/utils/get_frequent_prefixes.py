@@ -107,6 +107,11 @@ def get_frequent_prefixes(texts: List[str], min_prefix_len=200, max_prefix_len=5
     results = collect_results(root, min_prefix_len, threshold)
 
     results.sort(key=lambda x: x[1] * len(x[0]), reverse=True)
-    results = results[:max_results]
+    results = results[:min(max_results, len(results))]
+    
     results.sort(key=lambda x: len(x[0]), reverse=True) # sort by length to get the longest prefixes
+
+    # filter out prefixes with length less than min_prefix_len
+    results = [result for result in results if len(result[0]) >= max(min_prefix_len, 1)]
+
     return results
