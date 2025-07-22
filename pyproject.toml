@@ -3,8 +3,8 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hf-prefix-caching"
-version = "0.1.0"
+name = "hf_prefix_caching"
+version = "0.0.1"
 description = "A Python package for efficient prefix caching with HuggingFace models"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -19,4 +19,9 @@ dependencies = [
     "numpy",
 ]
 
-[tool.setuptools.packages.find] 
+[project.urls]
+Homepage="https://github.com/ba144220/hf-prefix-caching"
+Issues="https://github.com/ba144220/hf-prefix-caching/issues"
+
+[tool.setuptools.packages.find]
+include = ["hf_prefix_caching*"]

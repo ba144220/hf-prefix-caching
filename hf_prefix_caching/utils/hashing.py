@@ -1,7 +1,7 @@
 from typing import List
 import torch
 import hashlib
-from hf_prefix_caching.types import CacheHash
+from ..types import CacheHash
 
 def batched_hash(
     prev_hash: List[CacheHash],

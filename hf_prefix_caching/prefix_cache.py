@@ -2,9 +2,9 @@ from typing import Dict, Literal, List
 from datetime import datetime
 import torch
 from transformers.cache_utils import DynamicCache
-from hf_prefix_caching.types import CacheHash, CacheBlock
-from hf_prefix_caching.utils.cache import crop_first, concat_dynamic_cache
-from hf_prefix_caching.utils.hashing import batched_hash
+from .types import CacheHash, CacheBlock
+from .utils.cache import crop_first, concat_dynamic_cache
+from .utils.hashing import batched_hash
 
 INIT_HASH = CacheHash("0")
 
